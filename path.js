@@ -1,185 +1,242 @@
-var nodeGrid = {
-  x: 3,
-  y: 3,
-  $: $("#nodeGrid"),
-  list: [],
-  diag: false,
+function getDirs(diagonals = false) {
+  return [
+    [1, 0],
+    [-1, 0],
+    [0, 1],
+    [0, -1],
+  ].concat(
+    diagonals
+      ? [
+          [1, 1],
+          [1, -1],
+          [-1, 1],
+          [-1, -1],
+        ]
+      : []
+  );
+}
 
-  change: function () {
-    nodeGrid.x = Number($("#inputX").val());
-    nodeGrid.y = Number($("#inputY").val());
-    nodeGrid.list = [];
-    nodeGrid.$.html(function () {
-      var gridYDivs = "";
-      for (e = 0; e < nodeGrid.y; e++) {
-        gridYDivs += '<div class="row row-' + e + '"></div>';
-      }
-      return gridYDivs;
-    });
-    node.spawn(0, 0);
-    $("#end").text(
-      (nodeGrid.x - 1).toString() + "-" + (nodeGrid.y - 1).toString()
-    );
-  },
-};
+let dirs = getDirs();
 
-var node = {
-  $: $("#nodeGrid").find(".node"),
-  html: (gx, gy) =>
-    '<li class="node" id="n' +
-    gx.toString() +
-    "-" +
-    gy.toString() +
-    '" style="order:' +
-    gy.toString() +
-    gx.toString() +
-    '"></li>',
+const Colors = [
+  ["lightgrey", 1],
+  ["yellow", 3],
+  ["red", 10],
+];
+class Node {
+  bestCost = Infinity;
 
-  find: function (findX, findY) {
-    return nodeGrid.list.find(
-      (n) => n.id === findX.toString() + "-" + findY.toString()
-    );
-  },
+  constructor(x, y) {
+    this.x = x;
+    this.y = y;
+    const [color, cost] = Colors[Math.floor(Math.random() * Colors.length)];
+    this.color = color;
+    this.cost = cost;
+  }
+}
 
-  findId: function (id) {
-    return node.find(Number(id.split("-")[0]), Number(id.split("-")[1]));
-  },
+class MinCostNodeQueue {
+  constructor(size) {
+    this.qArr = new Array(size);
+    this.size = 0;
+  }
 
-  Node: function (x, y) {
-    this.id = x.toString() + "-" + y.toString();
-    this.neighbors = [];
-    this.cost = 1;
-    this.minPath = [this];
-    this.link = function (pushX, pushY) {
-      node.find(pushX, pushY).neighbors.push(this.id);
-      this.neighbors.push(pushX.toString() + "-" + pushY.toString());
-    };
-    this.nArray = function () {
-      var arr = [];
-      this.neighbors.forEach((z) => arr.push(node.findId(z)));
-      return arr;
-    };
-  },
+  parent(i) {
+    return Math.floor((i - 1) / 2);
+  }
 
-  spawn: function (gridX, gridY) {
-    var gx = gridX;
-    var gy = gridY;
-    // APPEND ITSELF
-    nodeGrid.list.push(new node.Node(gx, gy));
-    nodeGrid.$.find(".row:nth-of-type(" + (gy + 1) + ")").append(
-      node.html(gx, gy)
-    );
-    // FIND/SPAWN X [link self]
-    gx++;
-    // FIND X AND LINK
-    if (node.find(gx, gy) !== undefined) {
-      node.find(gx - 1, gy).link(gx, gy);
+  leftChild(i) {
+    return i * 2 + 1;
+  }
+
+  rightChild(i) {
+    return i * 2 + 2;
+  }
+
+  bestCostOf(i) {
+    return this.qArr[i].bestCost;
+  }
+
+  switch(i, ii) {
+    const temp = this.qArr[i];
+    this.qArr[i] = this.qArr[ii];
+    this.qArr[ii] = temp;
+  }
+
+  shiftUp(i) {
+    while (i > 0 && this.bestCostOf(this.parent(i)) > this.bestCostOf(i)) {
+      this.switch(this.parent(i), i);
+      i = this.parent(i);
     }
-    // SPAWN X AND LINK
-    else if (gx < nodeGrid.x) {
-      node.spawn(gx, gy);
-      node.find(gx - 1, gy).link(gx, gy);
-    }
-    gx--;
-    // SPAWN Y [link self]
-    gy++;
-    if (gy < nodeGrid.y) {
-      node.spawn(gx, gy);
-      node.find(gx, gy - 1).link(gx, gy);
-    }
-    gy--;
-    nodeGrid.diag ? node.diagsLink(gx, gy) : {};
-  },
+  }
 
-  diagsLink: function (x, y) {
-    // LINK UP AND RIGHT
-    node.find(x + 1, y - 1) !== undefined
-      ? node.find(x, y).link(x + 1, y - 1)
-      : {};
-    node.find(x + 1, y + 1) !== undefined
-      ? node.find(x, y).link(x + 1, y + 1)
-      : {};
-  },
-};
-
-var path = {
-  tentative: [],
-
-  findCost: function (node) {
-    var d = 0;
-    node.minPath.forEach((n) => (d += n.cost));
-    return d;
-  },
-
-  findMinCost: function (nodeArray) {
-    var minCost = 9999;
-    var minNode = {};
-    nodeArray.forEach(function (id) {
-      var test = path.findCost(id);
-      if (minCost > test) {
-        minCost = test;
-        minNode = id;
-      }
-    });
-    return minNode;
-  },
-
-  find: function (startNode, endNode) {
-    // MARK NODES AS UNVISITED
-    $("li").removeClass("path");
-    nodeGrid.list.forEach((x) => {
-      x.minPath = [x];
-    });
-    path.tentative = startNode.nArray().slice();
-    var nextNode = startNode;
-    // REPEAT THE FOLLOWING:
-    while (nextNode !== endNode) {
-      // CALCULATE DISTANCES FROM CURRENT NODE TO TENTATIVE NEIGHBORS
-      nextNode.nArray().forEach(function (n) {
+  shiftDown(i) {
+    let lowestCostIndex = i;
+    do {
+      i = lowestCostIndex;
+      for (const childIndex of [this.leftChild(i), this.rightChild(i)]) {
         if (
-          n.minPath.length === 1 ||
-          path.findCost(n) > path.findCost(nextNode) + n.cost
+          childIndex <= this.size &&
+          this.bestCostOf(childIndex) < this.bestCostOf(lowestCostIndex)
         ) {
-          n.minPath = nextNode.minPath.concat([n]);
-          path.tentative.push(n);
+          lowestCostIndex = childIndex;
         }
-      });
-      // VISIT CURRENT NODE
-      for (i = 0; i <= path.tentative.indexOf(nextNode); ) {
-        path.tentative.splice(path.tentative.indexOf(nextNode), 1);
       }
 
-      // FIND MINIMUM COST OF TENTATIVE NEIGHBOR NODES
-      nextNode = path.findMinCost(path.tentative);
+      this.switch(i, lowestCostIndex);
+    } while (lowestCostIndex !== i);
+  }
+
+  invalid(i) {
+    return [this.leftChild(i), this.rightChild(i)].some((childIndex) => {
+      return (
+        childIndex <= this.size &&
+        (this.bestCostOf(childIndex) < this.bestCostOf(i) ||
+          this.invalid(childIndex))
+      );
+    });
+  }
+
+  insert(node) {
+    this.qArr[this.size] = node;
+    this.shiftUp(this.size);
+    this.size++;
+  }
+
+  extract() {
+    this.size--;
+    const result = this.qArr[0];
+    this.qArr[0] = this.qArr[this.size];
+    this.shiftDown(0);
+    return result;
+  }
+}
+
+class NodeGrid {
+  constructor() {
+    this.resetNodeGrid();
+  }
+
+  get sizeX() {
+    return this.nodes[0].length;
+  }
+
+  get sizeY() {
+    return this.nodes.length;
+  }
+
+  resetNodeGrid() {
+    const sizeX = parseInt(document.getElementById("inputX").value);
+    const sizeY = parseInt(document.getElementById("inputY").value);
+    const grid = [];
+    for (let y = 0; y < sizeY; y++) {
+      grid.push([]);
+      for (let x = 0; x < sizeX; x++) {
+        grid[y].push(new Node(x, y));
+      }
     }
-    nextNode.minPath.forEach((n) => $("#n" + n.id).addClass("path"));
-    return nextNode.minPath;
-  },
-};
+    this.nodes = grid;
+    this.resetHTML();
+  }
 
-var lightgrey = 1;
-var yellow = 3;
-var red = 10;
+  resetHTML() {
+    const nodeGridHTML = document.getElementById("nodeGrid");
+    nodeGridHTML.replaceChildren();
 
-var randomCost = function () {
-  nodeGrid.list.forEach(function (n) {
-    $("li").removeClass("path");
-    num = [1, 3, 10][Math.floor(Math.random() * 3)];
-    n.cost = num;
-    $("#n" + n.id).css(
-      "background-color",
-      num === 1 ? "lightgrey" : num === 3 ? "yellow" : num === 10 ? "red" : {}
-    );
-  });
-};
+    let rowIndex = 0;
+    for (const row of this.nodes) {
+      const rowHTML = document.createElement("div");
+      rowHTML.className = `row row-${rowIndex}`;
+      nodeGridHTML.append(rowHTML);
 
-$('.gridSize input[type="number"]').change(nodeGrid.change);
-$("#randomCost").click(randomCost);
-$("#findPath").click(function () {
-  path.find(node.find(0, 0), node.find(nodeGrid.x - 1, nodeGrid.y - 1));
+      rowIndex++;
+
+      for (const node of row) {
+        const nodeHTML = document.createElement("li");
+        nodeHTML.className = "node";
+        nodeHTML.id = `n${node.x}-${node.y}`;
+        nodeHTML.style.backgroundColor = node.color;
+        rowHTML.append(nodeHTML);
+      }
+    }
+
+    document.getElementById("end").innerText = `${this.sizeX - 1}-${
+      this.sizeY - 1
+    }`;
+  }
+
+  getNeighbors(node) {
+    const neighbors = [];
+    let x, y;
+
+    for (const [dx, dy] of dirs) {
+      x = node.x + dx;
+      y = node.y + dy;
+
+      if (x < 0 || this.sizeX <= x) {
+        continue;
+      }
+
+      if (y < 0 || this.sizeY <= y) {
+        continue;
+      }
+
+      neighbors.push(this.nodes[y][x]);
+    }
+
+    return neighbors;
+  }
+
+  findPath(fromX, fromY, toX, toY) {
+    const startNode = this.nodes[fromY][fromX];
+    startNode.bestCost = startNode.cost;
+
+    let currentNode = startNode;
+    const q = new MinCostNodeQueue();
+    q.insert(startNode);
+
+    while (q.size > 0) {
+      currentNode = q.extract();
+
+      if (currentNode.x === toX && currentNode.y === toY) {
+        return currentNode;
+      } else {
+        for (const neighbor of this.getNeighbors(currentNode)) {
+          if (neighbor.bestCost > currentNode.bestCost + neighbor.cost) {
+            neighbor.bestCost = currentNode.bestCost + neighbor.cost;
+            neighbor.bestNode = currentNode;
+            q.insert(neighbor);
+          }
+        }
+      }
+    }
+  }
+}
+
+let nodeGrid = new NodeGrid();
+
+document
+  .querySelectorAll('input[type="number"]')
+  .forEach((elem) =>
+    elem.addEventListener("change", () => nodeGrid.resetNodeGrid())
+  );
+
+document.getElementById("randomCost").onclick = () => nodeGrid.resetNodeGrid();
+
+document.getElementById("diag").addEventListener("change", (e) => {
+  dirs = getDirs(e.target.checked);
 });
-$("#diag").change(function () {
-  nodeGrid.diag = $("#diag").prop("checked");
-  nodeGrid.change();
-});
-nodeGrid.change();
+
+document.getElementById("findPath").onclick = () => {
+  for (const row of nodeGrid.nodes) {
+    for (const node of row) {
+      node.bestCost = Infinity;
+    }
+  }
+  let node = nodeGrid.findPath(0, 0, nodeGrid.sizeX - 1, nodeGrid.sizeY - 1);
+
+  while (node) {
+    document.getElementById(`n${node.x}-${node.y}`).classList.add("path");
+    node = node.bestNode;
+  }
+};
