@@ -23,15 +23,28 @@ const Colors = [
   ["yellow", 3],
   ["red", 10],
 ];
+
+function changeColorCost() {
+  Colors[0][1] = parseInt(document.getElementById("lightgreyCost").value);
+  Colors[1][1] = parseInt(document.getElementById("yellowCost").value);
+  Colors[2][1] = parseInt(document.getElementById("redCost").value);
+}
+
 class Node {
   bestCost = Infinity;
+
+  get color() {
+    return this.colorCost[0];
+  }
+
+  get cost() {
+    return this.colorCost[1];
+  }
 
   constructor(x, y) {
     this.x = x;
     this.y = y;
-    const [color, cost] = Colors[Math.floor(Math.random() * Colors.length)];
-    this.color = color;
-    this.cost = cost;
+    this.colorCost = Colors[Math.floor(Math.random() * Colors.length)];
   }
 }
 
@@ -216,20 +229,18 @@ class NodeGrid {
 let nodeGrid = new NodeGrid();
 
 document
-  .querySelectorAll('input[type="number"]')
+  .querySelectorAll(".gridSize")
   .forEach((elem) =>
     elem.addEventListener("change", () => nodeGrid.resetNodeGrid())
   );
 
+document
+  .querySelectorAll(".nodeCost")
+  .forEach((elem) => elem.addEventListener("change", () => changeColorCost()));
+
 document.getElementById("randomCost").onclick = () => nodeGrid.resetNodeGrid();
 
 document.getElementById("diag").addEventListener("change", (e) => {
-  for (const row of nodeGrid.nodes) {
-    for (const node of row) {
-      node.bestCost = Infinity;
-      document.getElementById(`n${node.x}-${node.y}`).classList.remove("path");
-    }
-  }
   dirs = getDirs(e.target.checked);
 });
 
@@ -237,8 +248,10 @@ document.getElementById("findPath").onclick = () => {
   for (const row of nodeGrid.nodes) {
     for (const node of row) {
       node.bestCost = Infinity;
+      document.getElementById(`n${node.x}-${node.y}`).classList.remove("path");
     }
   }
+
   let node = nodeGrid.findPath(0, 0, nodeGrid.sizeX - 1, nodeGrid.sizeY - 1);
 
   while (node) {

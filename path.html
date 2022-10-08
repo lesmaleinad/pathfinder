@@ -12,14 +12,19 @@
   </head>
   <body>
     <div class="container">
-      <p class="gridSize">
-        X: <input type="number" name="" id="inputX" value="7" />
+      <p>
+        X: <input class="gridSize" min="1" type="number" name="" id="inputX" value="7" />
         <button id="randomCost">RandomCost</button>
       </p>
-      <p class="gridSize">
-        Y: <input type="number" name="" id="inputY" value="7" />
+      <p>
+        Y: <input class="gridSize" min="1" type="number" name="" id="inputY" value="7" />
         <button id="findPath">0-0 to <span id="end"></span></button>
         Diagonals:<input type="checkbox" id="diag" />
+      </p>
+      <p>
+        <div class="node" style="background-color: lightgrey;"></div> <input class="nodeCost" type="number" min="0" name="" id="lightgreyCost" value="1" />
+        <div class="node" style="background-color: yellow;"> </div> <input class="nodeCost" type="number" min="0" name="" id="yellowCost" value="3" />
+        <div class="node" style="background-color: red;"> </div> <input class="nodeCost" type="number" min="0" name="" id="redCost" value="10" />
       </p>
       <ul id="nodeGrid"></ul>
     </div>
