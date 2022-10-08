@@ -224,6 +224,12 @@ document
 document.getElementById("randomCost").onclick = () => nodeGrid.resetNodeGrid();
 
 document.getElementById("diag").addEventListener("change", (e) => {
+  for (const row of nodeGrid.nodes) {
+    for (const node of row) {
+      node.bestCost = Infinity;
+      document.getElementById(`n${node.x}-${node.y}`).classList.remove("path");
+    }
+  }
   dirs = getDirs(e.target.checked);
 });
 
